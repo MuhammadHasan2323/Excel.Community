@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>واجهة إكسل تفاعلية متقدمة</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Basic Reset and Body Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #e1e1e1;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        /* --- Guide Styles --- */
+        #guide-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 999;
+            display: none; /* Initially hidden */
+            pointer-events: none; /* Allow clicks to pass through overlay */
+        }
+        #guide-box {
+            position: absolute;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            max-width: 350px;
+            width: 90vw; /* Responsive width */
+            z-index: 1001;
+            transition: top 0.4s ease-in-out, left 0.4s ease-in-out;
+            pointer-events: auto;
+        }
+        #guide-box h3 { margin-top: 0; color: #0078d4; }
+        #guide-box p { font-size: 14px; line-height: 1.6; margin: 10px 0; }
+        #guide-next-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: none;
+            background-color: #0078d4;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        #guide-next-btn:hover { background-color: #106ebe; }
+        #guide-next-btn:disabled { background-color: #a0a0a0; cursor: not-allowed; }
+        
+        #guide-choices {
+            display: none; /* Hidden by default */
+            flex-direction: column; /* Stack buttons on mobile */
+            gap: 10px;
+            margin-top: 10px;
+        }
+        #guide-choices button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            color: white;
+        }
+        #guide-finish-btn {
+            background-color: #dc3545; /* Red for finishing */
+        }
+        #guide-restart-btn {
+            background-color: #28a745; /* Green for restarting */
+        }
+
+        /* Custom Alert Modal */
+        #question-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 1003; /* Higher than guide overlay */
+            display: none;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+        }
+        #question-box {
+            background: white;
+            color: #333;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            position: relative;
+        }
+        #question-feedback {
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 18px;
+            min-height: 25px;
+        }
+        #question-text {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        #question-choices-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .choice-btn {
+            padding: 10px 20px;
+            border: 1px solid #ccc;
+            background-color: #f0f0f0;
+            color: #333;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .choice-btn:hover:not(:disabled) {
+             background-color: #e0e0e0;
+        }
+        .choice-btn.correct {
+            background-color: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+        .choice-btn.incorrect {
+            background-color: #6c757d; /* Grey for incorrect */
+            color: white;
+            border-color: #6c757d;
+        }
+        .choice-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        #choice-explanation {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #555;
+            line-height: 1.5;
+            min-height: 20px;
+        }
+        #question-continue-btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            background-color: #0078d4;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            display: none;
+        }
+        /* Confetti Styles */
+        #confetti-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 15px;
+            background-color: #f00;
+            opacity: 0.9;
+            animation: fall 4s linear forwards;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(110vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Guide Arrow */
+        #guide-box::before {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+        }
+        #guide-box.arrow-top::before { bottom: 100%; left: 50%; transform: translateX(-50%); border-width: 0 10px 10px 10px; border-color: transparent transparent white transparent; }
+        #guide-box.arrow-bottom::before { top: 100%; left: 50%; transform: translateX(-50%); border-width: 10px 10px 0 10px; border-color: white transparent transparent transparent; }
+        #guide-box.arrow-left::before { top: 50%; right: 100%; transform: translateY(-50%); border-width: 10px 10px 10px 0; border-color: transparent white transparent transparent; }
+        #guide-box.arrow-right::before { top: 50%; left: 100%; transform: translateY(-50%); border-width: 10px 0 10px 10px; border-color: transparent transparent transparent white; }
+        
+        .highlight-element {
+            position: relative;
+            z-index: 1000 !important;
+            box-shadow: 0 0 0 3px #0078d4, 0 0 15px rgba(0, 120, 212, 0.5);
+            border-radius: 3px;
+            transition: box-shadow 0.3s ease-in-out;
+        }
+        .sub-highlight-element {
+            position: relative;
+            z-index: 1000 !important;
+            box-shadow: 0 0 0 3px #20c997, 0 0 15px rgba(32, 201, 151, 0.5); /* Teal color */
+            border-radius: 3px;
+            transition: box-shadow 0.3s ease-in-out;
+        }
+        
+        #fake-cursor {
+            font-size: 24px;
+            color: #333;
+            text-shadow: 0 0 3px white, 0 0 3px white;
+            position: fixed;
+            z-index: 1002;
+            pointer-events: none;
+            transition: top 0.3s ease-in-out, left 0.3s ease-in-out, transform 0.1s ease-in-out;
+            transform: scale(1);
+            display: none;
+        }
+        #fake-cursor.clicking {
+            transform: scale(0.8);
+        }
+
+        /* --- End Guide Styles --- */
+
+        /* Main Application Window */
+        .excel-window {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90vw;
+            height: 90vh;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: opacity 0.4s ease-out, width 0.3s ease-in-out, height 0.3s ease-in-out, top 0.3s ease-in-out, left 0.3s ease-in-out, transform 0.3s ease-in-out;
+            pointer-events: none;
+        }
+        
+        /* Title Bar */
+        .title-bar {
+            background: linear-gradient(to bottom, #0078d4, #106ebe);
+            color: white;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            user-select: none;
+            flex-shrink: 0;
+            gap: 10px;
+        }
+        .title-bar .icon {
+            width: 16px; height: 16px;
+            background-image: url("https://img.icons8.com/color/48/microsoft-excel-2019--v1.png");
+            background-size: contain;
+        }
+        .workbook-name {
+            font-size: 12px;
+            font-weight: 500;
+            padding: 2px 5px;
+            border-radius: 2px;
+        }
+
+        /* Quick Access Toolbar inside Title Bar */
+        .quick-access { 
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .quick-access .btn { 
+            width: 22px; height: 22px; 
+            background: transparent; border: 1px solid transparent; 
+            border-radius: 3px; font-size: 14px; display: flex; 
+            align-items: center; justify-content: center; color: #fff; 
+            transition: background-color 0.2s;
+        }
+        
+        .title-bar-center { flex-grow: 1; display: flex; justify-content: center; align-items: center; }
+        #searchBox { width: 40%; max-width: 300px; height: 22px; border-radius: 4px; border: 1px solid #75aae0; background-color: rgba(255,255,255,0.85); padding: 0 8px; font-size: 12px; }
+        #searchBox::placeholder { color: #666; }
+        .title-bar .controls { display: flex; gap: 2px; margin-left: auto; }
+        .title-bar .control-btn { width: 30px; height: 20px; background: rgba(255,255,255,0.1); border: none; color: white; font-size: 10px; border-radius: 2px; }
+
+        /* Ribbon */
+        .ribbon { background: #f8f9fa; border-bottom: 1px solid #d1d5db; display: flex; flex-direction: column; flex-shrink: 0; }
+        .ribbon-tabs { display: flex; background: #e9ecef; height: 30px; border-bottom: 1px solid #d1d5db; align-items: flex-end;}
+        .ribbon-tab { padding: 6px 12px; font-size: 12px; border-right: 1px solid #d1d5db; color: #495057; transition: background-color 0.2s; white-space: nowrap; }
+        .ribbon-tab.active { background: #f8f9fa; color: #212529; border-bottom: 1px solid #f8f9fa; position: relative; top: 1px; }
+        .ribbon-content { height: auto; min-height: 92px; padding: 4px; display: flex; align-items: stretch; gap: 4px; flex-wrap: wrap; }
+        .ribbon-group { display: flex; flex-direction: column; padding: 4px 8px; border-right: 1px solid #e9ecef; }
+        .ribbon-group-title { font-size: 11px; color: #6c757d; text-align: center; margin-top: auto; }
+        .ribbon-commands { flex-grow: 1; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .ribbon-command { font-size: 14px; font-weight: bold; padding: 4px; border-radius: 3px; }
+
+        /* Formula Bar */
+        .formula-bar-container { height: 24px; background: #f8f9fa; border-bottom: 1px solid #d1d5db; display: flex; align-items: center; padding: 0 8px; z-index: 10; flex-shrink: 0; }
+        #nameBox { width: 60px; height: 18px; border: 1px solid #ced4da; font-size: 11px; padding: 0 4px; line-height: 16px; background: #fff; margin-right: 8px; border-radius: 2px; }
+        #formulaInput { flex: 1; height: 18px; border: 1px solid #ced4da; font-size: 11px; padding: 0 4px; background: #fff; color: #333; border-radius: 2px; }
+
+        /* Content Area */
+        .content-area { flex-grow: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+        .spreadsheet-area { position: absolute; inset: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: #a8a8a8 #f1f3f4;}
+
+        .spreadsheet { display: grid; grid-template-columns: 40px repeat(26, 80px); /* Smaller columns for mobile */ grid-template-rows: 20px repeat(100, 22px); }
+        .cell, .header { border-right: 1px solid #eee; border-bottom: 1px solid #eee; font-size: 10px; /* smaller font */ padding: 2px 4px; overflow: hidden; white-space: nowrap; }
+        .header { background: #f1f3f4; display: flex; align-items: center; justify-content: center; color: #5f6368; font-weight: 500; }
+        .col-header { position: sticky; top: 0; z-index: 5; }
+        .row-header { position: sticky; left: 0; z-index: 4; }
+        .cell.active { outline: 2px solid #1a73e8; outline-offset: -2px; z-index: 3; }
+        .search-result-flash { background-color: #ffc; }
+
+        /* Sheet Tabs */
+        .sheet-tabs { height: 25px; background: #f0f0f0; border-top: 1px solid #d1d5db; flex-shrink: 0; display: flex; align-items: center; padding: 0 4px; }
+        .sheet-tab { padding: 4px 8px; font-size: 11px; border: 1px solid transparent; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
+        .sheet-tab.active { background-color: #fff; border-color: #d1d5db; }
+        .add-sheet-btn { font-size: 14px; font-weight: bold; padding: 0 6px; border-radius: 50%; }
+
+        /* Status Bar */
+        .status-bar { height: 22px; background: #0078d4; border-top: 1px solid #d1d5db; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; font-size: 10px; color: white; flex-wrap: wrap; }
+        .status-left, .status-right { display: flex; align-items: center; gap: 10px; }
+        .view-buttons button { background: none; border: 1px solid white; color: white; border-radius: 3px; padding: 1px 4px;}
+        #zoomSlider { width: 80px; height: 3px; background: #75aae0; outline: none; vertical-align: middle;}
+        #zoomSlider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 10px; height: 10px; background: #fff; border-radius: 50%; }
+        
+
+        /* Taskbar */
+        #taskbar { position: absolute; bottom: 0; left: 0; width: 100%; height: 40px; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border-top: 1px solid #ccc; display: flex; align-items: center; padding: 0 10px; gap: 5px; z-index: 200; }
+        .taskbar-item { height: 30px; padding: 0 15px; background: rgba(0, 120, 212, 0.1); border: 1px solid #0078d4; border-radius: 4px; display: flex; align-items: center; font-size: 13px; color: #333; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        
+        /* Responsive Media Queries */
+        @media (min-width: 768px) {
+            .excel-window {
+                width: 85vw;
+                height: 85vh;
+            }
+            .spreadsheet {
+                grid-template-columns: 40px repeat(26, 100px); /* Default columns for tablet+ */
+            }
+            .cell, .header {
+                font-size: 11px;
+            }
+            .ribbon-tab {
+                padding: 6px 16px;
+                font-size: 13px;
+            }
+            #guide-choices {
+                flex-direction: row; /* Horizontal buttons for larger screens */
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="fake-cursor"><i class="fa-solid fa-arrow-pointer"></i></div>
+<div id="taskbar"></div>
+<div id="guide-overlay">
+    <div id="guide-box">
+        <h3 id="guide-title"></h3>
+        <p id="guide-text"></p>
+        <button id="guide-next-btn">حسناً، فهمت</button>
+        <div id="guide-choices">
+            <button id="guide-restart-btn">إعادة العرض</button>
+            <button id="guide-finish-btn">إنهاء</button>
+        </div>
+    </div>
+</div>
+<div id="question-overlay">
+    <div id="question-box">
+        <div id="confetti-container"></div>
+        <p id="question-feedback"></p>
+        <p id="question-text"></p>
+        <div id="question-choices-container"></div>
+        <p id="choice-explanation"></p>
+        <button id="question-continue-btn">استكمال</button>
+    </div>
+</div>
+
+<div class="excel-window" id="excelWindow">
+    <div class="title-bar" id="titleBar">
+        <div class="icon"></div>
+        <div class="workbook-name" id="workbookName">Book1.xlsx</div>
+        <div class="quick-access">
+            <div class="btn" title="Save" id="save-btn">💾</div>
+            <div class="btn" title="Undo" id="undo-btn">↶</div>
+            <div class="btn" title="Redo" id="redo-btn">↷</div>
+        </div>
+        <div class="title-bar-center">
+            <input type="text" id="searchBox" placeholder="Search" disabled>
+        </div>
+        <div class="controls">
+            <button class="control-btn" id="minimizeBtn" title="Minimize">−</button>
+            <button class="control-btn" id="maximizeBtn" title="Maximize">□</button>
+            <button class="control-btn" id="closeBtn" title="Close">×</button>
+        </div>
+    </div>
+    
+    <div class="ribbon">
+        <div class="ribbon-tabs" id="ribbon-tabs">
+            <div class="ribbon-tab active" id="home-tab">Home</div>
+            <div class="ribbon-tab" id="insert-tab">Insert</div>
+            <div class="ribbon-tab" id="layout-tab">Layout</div>
+        </div>
+        <div class="ribbon-content">
+            <div class="ribbon-group" id="font-group">
+                <div class="ribbon-commands" id="font-commands">
+                    <div class="ribbon-command">B</div>
+                    <div class="ribbon-command">I</div>
+                    <div class="ribbon-command">U</div>
+                </div>
+                <div class="ribbon-group-title">Font</div>
+            </div>
+             <div class="ribbon-group" id="align-group">
+                <div class="ribbon-commands">
+                    <div class="ribbon-command">Left</div>
+                    <div class="ribbon-command">Center</div>
+                </div>
+                <div class="ribbon-group-title">Alignment</div>
+            </div>
+        </div>
+    </div>
+    <div class="formula-bar-container">
+        <div id="nameBox">A1</div>
+        <input type="text" id="formulaInput" value="" disabled>
+    </div>
+    <div class="content-area">
+         <div class="spreadsheet-area" id="spreadsheetArea">
+            <div class="spreadsheet" id="spreadsheet"></div>
+        </div>
+    </div>
+    <div class="sheet-tabs" id="sheet-tabs">
+        <div class="sheet-tab active" id="sheet1">Sheet1</div>
+        <div class="sheet-tab" id="sheet2">Sheet2</div>
+        <div class="sheet-tab add-sheet-btn" id="add-sheet-btn">+</div>
+    </div>
+    <div class="status-bar">
+        <div class="status-left" id="status-cell">Ready</div>
+        <div class="status-right">
+            <span id="status-stats">Sum: 123</span>
+            <span class="view-buttons" id="view-buttons">
+                <button>⊞</button>
+                <button>📖</button>
+            </span>
+            <span id="zoom-controls">
+                <input type="range" min="50" max="200" value="100" id="zoomSlider">
+                <span id="zoomPercentage">100%</span>
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM REFERENCES ---
+        const excelWindow = document.getElementById('excelWindow');
+        const spreadsheetContainer = document.getElementById('spreadsheet');
+        const spreadsheetArea = document.getElementById('spreadsheetArea');
+        const workbookNameEl = document.getElementById('workbookName');
+        const nameBox = document.getElementById('nameBox');
+        const formulaInput = document.getElementById('formulaInput');
+        const taskbar = document.getElementById('taskbar');
+        const sheetTabsContainer = document.getElementById('sheet-tabs');
+        const maximizeBtn = document.getElementById('maximizeBtn');
+        const fakeCursor = document.getElementById('fake-cursor');
+
+        // Guide DOM References
+        const guideOverlay = document.getElementById('guide-overlay');
+        const guideBox = document.getElementById('guide-box');
+        const guideTitle = document.getElementById('guide-title');
+        const guideText = document.getElementById('guide-text');
+        const guideNextBtn = document.getElementById('guide-next-btn');
+        const guideChoices = document.getElementById('guide-choices');
+        const guideRestartBtn = document.getElementById('guide-restart-btn');
+        const guideFinishBtn = document.getElementById('guide-finish-btn');
+        const questionOverlay = document.getElementById('question-overlay');
+        const questionText = document.getElementById('question-text');
+        const questionChoicesContainer = document.getElementById('question-choices-container');
+        const questionContinueBtn = document.getElementById('question-continue-btn');
+        const questionFeedback = document.getElementById('question-feedback');
+        const choiceExplanation = document.getElementById('choice-explanation');
+        const confettiContainer = document.getElementById('confetti-container');
+
+        // --- STATE ---
+        let isMaximized = false;
+        let originalWindowState = {};
+        let highlightedEl = null; 
+        let currentStepIndex = 0;
+        
+        // --- SPREADSHEET LOGIC ---
+        function initSpreadsheet() {
+            const NUM_ROWS = 50; const NUM_COLS = 26;
+            spreadsheetContainer.innerHTML = '';
+            // Create column headers
+            for (let c = -1; c < NUM_COLS; c++) {
+                const header = document.createElement('div');
+                header.className = 'header col-header';
+                if (c >= 0) header.textContent = String.fromCharCode(65 + c);
+                header.style.gridColumn = c + 2;
+                spreadsheetContainer.appendChild(header);
+            }
+            // Create rows and cells
+            for (let r = 1; r <= NUM_ROWS; r++) {
+                const rowHeader = document.createElement('div');
+                rowHeader.className = 'header row-header';
+                rowHeader.textContent = r;
+                rowHeader.style.gridRow = r + 1;
+                spreadsheetContainer.appendChild(rowHeader);
+                for (let c = 0; c < NUM_COLS; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.col = c;
+                    cell.dataset.row = r;
+                    cell.style.gridColumn = c + 2;
+                    cell.style.gridRow = r + 1;
+                    spreadsheetContainer.appendChild(cell);
+                }
+            }
+        }
+
+        // --- GUIDE ACTIONS ---
+        const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+        async function moveCursorTo(element, duration = 300) {
+            if (!element) return;
+            const rect = element.getBoundingClientRect();
+            fakeCursor.style.left = `${rect.left + rect.width / 2}px`;
+            fakeCursor.style.top = `${rect.top + rect.height / 2}px`;
+            await sleep(duration);
+        }
+        
+        async function clickCursor() {
+            fakeCursor.classList.add('clicking');
+            await sleep(150);
+            fakeCursor.classList.remove('clicking');
+            await sleep(150);
+        }
+        
+        async function flashElement(element, duration = 400) {
+            if (!element) return;
+            element.classList.add('flash-highlight');
+            await sleep(duration);
+            element.classList.remove('flash-highlight');
+            await sleep(100);
+        }
+        
+        const correctPhrases = ["أحسنت! 😁", "إجابة رائعة!", "صحيح تمامًا! ✨", "ممتاز! 👍"];
+        const incorrectPhrases = ["😉 أنت على وشك اختيار الإجابة الصحيحة", "🤗 لاتقلق بشأن هذا، اختر إجابتك الآن", " هل تظن أن الإجابة القادمة هي الإجابة الصحيحة؟ �", "لقد تعلمنا المزيد، اجابتك القادمة هي الصحيحة بالتأكيد. 🤗"];
+        
+        function launchConfetti() {
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.animationDuration = Math.random() * 2 + 3 + 's';
+                confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                confetti.style.transform = `scale(${Math.random() * 0.5 + 0.5})`;
+                confettiContainer.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 5000);
+            }
+        }
+
+        async function askQuestion(question, choices, answer, explanations) {
+            return new Promise(resolve => {
+                let wrongAttempts = 0;
+                questionText.textContent = question;
+                questionFeedback.textContent = '';
+                questionChoicesContainer.innerHTML = ''; 
+                choiceExplanation.textContent = '';
+                questionContinueBtn.style.display = 'none';
+
+                choices.forEach(choice => {
+                    const button = document.createElement('button');
+                    button.textContent = choice;
+                    button.className = 'choice-btn';
+                    button.onclick = () => {
+                        choiceExplanation.textContent = '';
+                        
+                        if (choice === answer) {
+                            Array.from(questionChoicesContainer.children).forEach(btn => btn.disabled = true);
+                            button.classList.add('correct');
+                            questionFeedback.textContent = correctPhrases[Math.floor(Math.random() * correctPhrases.length)];
+                            questionFeedback.style.color = '#28a745';
+                            launchConfetti();
+                            questionContinueBtn.style.display = 'block';
+                        } else {
+                            button.classList.add('incorrect');
+                            button.disabled = true; 
+                            wrongAttempts++;
+                            if(wrongAttempts === 1){
+                                 questionFeedback.textContent = 'لا يهم، حاول مرة أخرى يا صديقي! 😉';
+                            } else {
+                                 questionFeedback.textContent = `🤗 ${incorrectPhrases[Math.floor(Math.random() * incorrectPhrases.length)]}`;
+                            }
+                            questionFeedback.style.color = '#6c757d';
+                            if (explanations && explanations[choice]) {
+                                choiceExplanation.textContent = explanations[choice];
+                            }
+                        }
+                    };
+                    questionChoicesContainer.appendChild(button);
+                });
+                
+                questionContinueBtn.onclick = () => {
+                    questionOverlay.style.display = 'none';
+                    resolve();
+                };
+
+                questionOverlay.style.display = 'flex';
+            });
+        }
+        
+        // --- TITLE BAR ---
+        async function demonstrateMove() {
+            await moveCursorTo(document.querySelector('.title-bar'));
+            fakeCursor.classList.add('clicking');
+            const currentLeft = excelWindow.offsetLeft;
+            const currentTop = excelWindow.offsetTop;
+            excelWindow.style.left = `${currentLeft + 20}px`;
+            excelWindow.style.top = `${currentTop + 15}px`;
+            fakeCursor.style.left = `${fakeCursor.offsetLeft + 20}px`;
+            fakeCursor.style.top = `${fakeCursor.offsetTop + 15}px`;
+            await sleep(600);
+            excelWindow.style.left = `${currentLeft}px`;
+            excelWindow.style.top = `${currentTop}px`;
+            fakeCursor.classList.remove('clicking');
+        }
+        async function demonstrateRename() {
+            await moveCursorTo(workbookNameEl);
+            await clickCursor();
+            await clickCursor();
+            workbookNameEl.textContent = 'Annual Report.xlsx';
+            await sleep(1200);
+            workbookNameEl.textContent = 'Book1.xlsx';
+        }
+        async function demonstrateSearch() {
+            await moveCursorTo(document.getElementById('searchBox'));
+            await clickCursor();
+            document.getElementById('searchBox').value = 'Chart';
+            await sleep(1200);
+            document.getElementById('searchBox').value = '';
+        }
+        async function demonstrateMinimize() {
+            const minimizeBtn = document.getElementById('minimizeBtn');
+            await moveCursorTo(minimizeBtn);
+            await clickCursor();
+            excelWindow.style.opacity = '0';
+            const taskbarItem = document.createElement('div');
+            taskbarItem.className = 'taskbar-item';
+            taskbarItem.id = 'temp-taskbar-item';
+            taskbarItem.textContent = workbookNameEl.textContent;
+            taskbar.appendChild(taskbarItem);
+            await sleep(1200);
+            await moveCursorTo(taskbarItem);
+            await clickCursor();
+            taskbar.removeChild(taskbarItem);
+            excelWindow.style.opacity = '1';
+        }
+        async function demonstrateMaximizeAndRestore() {
+            const maximizeBtn = document.getElementById('maximizeBtn');
+            await moveCursorTo(maximizeBtn);
+            await clickCursor();
+            originalWindowState = { width: excelWindow.style.width, height: excelWindow.style.height, top: excelWindow.style.top, left: excelWindow.style.left, transform: excelWindow.style.transform };
+            Object.assign(excelWindow.style, { width: '100vw', height: `100vh`, top: '0px', left: '0px', transform: 'translate(0, 0)' });
+            maximizeBtn.innerHTML = '❐'; 
+            isMaximized = true;
+            
+            await sleep(1200);
+            
+            await moveCursorTo(maximizeBtn);
+            await clickCursor();
+            Object.assign(excelWindow.style, originalWindowState);
+            excelWindow.style.transform = 'translate(-50%, -50%)';
+            maximizeBtn.innerHTML = '□'; 
+            isMaximized = false;
+        }
+        async function demonstrateCloseAndReopen() {
+            await moveCursorTo(document.getElementById('closeBtn'));
+            await clickCursor();
+            excelWindow.style.opacity = '0';
+            await sleep(1200);
+            excelWindow.style.opacity = '1';
+        }
+
+        // --- QUICK ACCESS ---
+        async function demonstrateSave() { await moveCursorTo(document.getElementById('save-btn')); await clickCursor();}
+        async function demonstrateUndo() { await moveCursorTo(document.getElementById('undo-btn')); await clickCursor();}
+        async function demonstrateRedo() { await moveCursorTo(document.getElementById('redo-btn')); await clickCursor();}
+        
+        // --- RIBBON ---
+        async function demonstrateRibbonTabs() {
+            const homeTab = document.getElementById('home-tab');
+            const insertTab = document.getElementById('insert-tab');
+            await moveCursorTo(insertTab);
+            await clickCursor();
+            homeTab.classList.remove('active');
+            insertTab.classList.add('active');
+            await sleep(1000);
+            await moveCursorTo(homeTab);
+            await clickCursor();
+            insertTab.classList.remove('active');
+            homeTab.classList.add('active');
+        }
+        async function demonstrateCommandGroups() { await moveCursorTo(document.getElementById('align-group')); await flashElement(document.getElementById('align-group')); }
+        async function demonstrateCommands() { await moveCursorTo(document.getElementById('font-commands')); await flashElement(document.getElementById('font-commands')); }
+
+        // --- FORMULA BAR ---
+        async function demonstrateFormulaBar() {
+            await moveCursorTo(formulaInput);
+            const originalText = nameBox.textContent;
+            nameBox.textContent = 'C3';
+            formulaInput.value = '=SUM(C1:C2)'; 
+            await sleep(1500); 
+            formulaInput.value = '';
+            nameBox.textContent = originalText;
+        }
+
+        // --- WORKSPACE ---
+        async function demonstrateColumns() { await moveCursorTo(document.querySelector(".header[style*='grid-column: 4']")); await flashElement(document.querySelector(".header[style*='grid-column: 4']")); } // Column C
+        async function demonstrateRows() { await moveCursorTo(document.querySelector(".header[style*='grid-row: 6']")); await flashElement(document.querySelector(".header[style*='grid-row: 6']")); } // Row 5
+        async function demonstrateCells() { await moveCursorTo(document.querySelector(".cell[data-col='4'][data-row='4']")); await flashElement(document.querySelector(".cell[data-col='4'][data-row='4']")); } // Cell E4
+        async function demonstrateActiveCell() {
+            const cellA1 = document.querySelector(".cell[data-col='0'][data-row='1']");
+            const cellB2 = document.querySelector(".cell[data-col='1'][data-row='2']");
+            await moveCursorTo(cellB2);
+            await clickCursor();
+            if (cellA1) cellA1.classList.remove('active');
+            if (cellB2) {
+                cellB2.classList.add('active');
+                nameBox.textContent = 'B2';
+                await sleep(1500);
+                cellB2.classList.remove('active');
+            }
+            if (cellA1) {
+                cellA1.classList.add('active');
+                nameBox.textContent = 'A1';
+            }
+        }
+
+        // --- SCROLL BAR ---
+        async function demonstrateScroll() {
+            await moveCursorTo(spreadsheetArea);
+            spreadsheetArea.scrollTop = 50;
+            await sleep(800);
+            spreadsheetArea.scrollLeft = 80;
+            await sleep(800);
+            spreadsheetArea.scrollTop = 0;
+            spreadsheetArea.scrollLeft = 0;
+        }
+
+        // --- SHEET TABS ---
+        async function demonstrateAddSheet() {
+            await moveCursorTo(document.getElementById('add-sheet-btn'));
+            await clickCursor();
+            const newSheet = document.createElement('div');
+            newSheet.className = 'sheet-tab';
+            newSheet.textContent = 'Sheet3';
+            sheetTabsContainer.appendChild(newSheet);
+            await sleep(1200);
+            sheetTabsContainer.removeChild(newSheet);
+        }
+        async function demonstrateRenameSheet() {
+            const sheet1 = document.getElementById('sheet1');
+            await moveCursorTo(sheet1);
+            sheet1.textContent = 'Report';
+            await sleep(1200);
+            sheet1.textContent = 'Sheet1';
+        }
+        async function demonstrateRemoveSheet() {
+            const sheet2 = document.getElementById('sheet2');
+            await moveCursorTo(sheet2);
+            sheet2.style.display = 'none';
+            await sleep(1200);
+            sheet2.style.display = 'block';
+        }
+
+        // --- STATUS BAR ---
+        async function demonstrateCellStatus() { await moveCursorTo(document.getElementById('status-cell')); await flashElement(document.getElementById('status-cell')); }
+        async function demonstrateRangeStats() { await moveCursorTo(document.getElementById('status-stats')); await flashElement(document.getElementById('status-stats')); }
+        async function demonstrateViewButtons() { await moveCursorTo(document.getElementById('view-buttons')); await flashElement(document.getElementById('view-buttons')); }
+        async function demonstrateZoom() {
+            const slider = document.getElementById('zoomSlider');
+            await moveCursorTo(slider);
+            const percentage = document.getElementById('zoomPercentage');
+            slider.value = 150;
+            percentage.textContent = '150%';
+            await sleep(1000);
+            slider.value = 100;
+            percentage.textContent = '100%';
+        }
+
+        // --- GUIDE STEPS ---
+        const guideSteps = [
+            // 1- Title Bar
+            { type: 'main', selector: '.title-bar', title: 'شريط العنوان', text: 'أولاً، شريط العنوان، الذي يحتوي على عناصر التحكم الرئيسية للنافذة.'},
+            { type: 'sub', selector: '.title-bar', title: 'تحريك النافذة', text: 'يمكنك تحريك النافذة عن طريق سحب شريط العنوان.', action: demonstrateMove },
+            { type: 'sub', selector: '.workbook-name', title: 'اسم المصنف', text: 'يتم عرض اسم المصنف (Book1) والامتداد الافتراضي (.xlsx) هنا. الاسم الكامل للملف هو "Book1.xlsx".', action: demonstrateRename },
+            { type: 'sub', selector: '#searchBox', title: 'البحث', text: 'يسمح لك مربع البحث بالعثور على الميزات أو المحتوى داخل التطبيق.', action: demonstrateSearch },
+            { type: 'sub', selector: '#minimizeBtn', title: 'تصغير', text: 'يقوم هذا الزر بتصغير النافذة إلى شريط المهام.', action: demonstrateMinimize },
+            { type: 'sub', selector: '#maximizeBtn', title: 'تكبير / استعادة', text: 'يقوم هذا الزر بالتبديل بين وضع ملء الشاشة والحجم الأصلي للنافذة.', action: demonstrateMaximizeAndRestore },
+            { type: 'sub', selector: '#closeBtn', title: 'إغلاق', text: 'يقوم زر الإغلاق بإخفاء النافذة.', action: demonstrateCloseAndReopen },
+            { isQuestion: true, text: 'سؤال: ما هو الامتداد الافتراضي لملف إكسل؟', choices: ['.docx', '.xlsx', '.pptx'], answer: '.xlsx', explanations: { '.docx': 'هذا امتداد لملفات Microsoft Word.', '.pptx': 'هذا امتداد لملفات Microsoft PowerPoint.'} },
+            // 2- Quick Access Toolbar
+            { type: 'main', selector: '.quick-access', title: 'شريط أدوات الوصول السريع', text: 'يوفر اختصارات لأوامرك الأكثر استخدامًا.'},
+            { type: 'sub', selector: '#save-btn', title: 'حفظ', text: 'يحفظ الحالة الحالية للمصنف.', action: demonstrateSave },
+            { type: 'sub', selector: '#undo-btn', title: 'تراجع', text: 'يتراجع عن آخر إجراء قمت به.', action: demonstrateUndo },
+            { type: 'sub', selector: '#redo-btn', title: 'إعادة', text: 'يعيد تطبيق إجراء قمت بالتراجع عنه للتو.', action: demonstrateRedo },
+            { isQuestion: true, text: 'سؤال: ماذا يفعل أمر "تراجع"؟', choices: ['يحفظ الملف', 'يكرر الإجراء الأخير', 'يلغي الإجراء الأخير'], answer: 'يلغي الإجراء الأخير', explanations: {'يحفظ الملف': 'هذه وظيفة أمر "حفظ".', 'يكرر الإجراء الأخير': 'هذه وظيفة أمر "إعادة".'} },
+            // 3- Ribbon
+            { type: 'main', selector: '.ribbon', title: 'الشريط', text: 'يحتوي الشريط على جميع الأوامر، منظمة لسهولة الوصول إليها.'},
+            { type: 'sub', selector: '#ribbon-tabs', title: 'علامات تبويب الشريط', text: 'يتم تنظيم الأوامر في علامات تبويب مثل "Home" و "Insert".', action: demonstrateRibbonTabs},
+            { type: 'sub', selector: '#align-group', title: 'مجموعات الأوامر', text: 'تحتوي كل علامة تبويب على مجموعات من الأوامر ذات الصلة، مثل مجموعة "Alignment".', action: demonstrateCommandGroups },
+            { type: 'sub', selector: '#font-commands', title: 'أوامر الشريط', text: 'هذه هي الأزرار والأدوات الفردية التي تستخدمها للعمل على ورقتك.', action: demonstrateCommands },
+            { isQuestion: true, text: 'سؤال: أين توجد \'مجموعات الأوامر\'؟', choices: ['داخل علامات التبويب', 'في شريط الحالة', 'في شريط العنوان'], answer: 'داخل علامات التبويب', explanations: {'في شريط الحالة': 'شريط الحالة يعرض معلومات وليس أوامر.', 'في شريط العنوان': 'شريط العنوان يحتوي على عناصر تحكم النافذة واسم الملف.'} },
+            // 4- Name Box
+            { type: 'main', selector: '#nameBox', title: 'مربع الاسم', text: 'يعرض عنوان الخلية المحددة حاليًا (النشطة).' },
+            // 5- Formula Bar
+            { type: 'main', selector: '.formula-bar-container', title: 'شريط الصيغة', text: 'يستخدم لإدخال أو تحرير البيانات والصيغ في الخلية النشطة.', action: demonstrateFormulaBar },
+            { isQuestion: true, text: 'سؤال: ما هي وظيفة شريط الصيغة؟', choices: ['عرض اسم الخلية', 'إدخال وتحرير الصيغ', 'تغيير الخط'], answer: 'إدخال وتحرير الصيغ', explanations: {'عرض اسم الخلية': 'هذه وظيفة "مربع الاسم".', 'تغيير الخط': 'يتم ذلك من خلال "أوامر الشريط".'} },
+            // 6- Workspace
+            { type: 'main', selector: '.spreadsheet-area', title: 'مساحة العمل', text: 'الشبكة الرئيسية للخلايا حيث تعمل.' },
+            { type: 'sub', selector: ".header[style*='grid-column: 4']", title: 'الأعمدة', text: 'تعمل الأعمدة بشكل عمودي ويتم تحديدها بأحرف (A, B, C...). يحتوي Excel على 16,384 عمودًا.', action: demonstrateColumns},
+            { type: 'sub', selector: ".header[style*='grid-row: 6']", title: 'الصفوف', text: 'تعمل الصفوف بشكل أفقي ويتم تحديدها بأرقام (1, 2, 3...). يحتوي Excel على 1,048,576 صفًا.', action: demonstrateRows },
+            { type: 'sub', selector: ".cell[data-col='4'][data-row='4']", title: 'الخلايا', text: 'تقاطع الصف والعمود هو خلية. يحتوي Excel على أكثر من 17 مليار خلية.', action: demonstrateCells},
+            { type: 'sub', selector: '.cell.active', title: 'الخلية النشطة', text: 'الخلية المظللة هي الخلية النشطة، وهي جاهزة لإدخال البيانات.', action: demonstrateActiveCell },
+            { isQuestion: true, text: 'سؤال: كيف يتم ترقيم الصفوف في مساحة العمل؟', choices: ['بأحرف', 'بأرقام', 'برموز'], answer: 'بأرقام', explanations: {'بأحرف': 'الأعمدة هي التي يتم ترقيمها بالأحرف.', 'برموز': 'لا تستخدم الرموز لترقيم الصفوف أو الأعمدة.'} },
+            // 7- Scroll bar
+            { type: 'main', selector: '.spreadsheet-area', title: 'أشرطة التمرير', text: 'تستخدم للتنقل. الشريط العمودي يتحرك لأعلى ولأسفل، والشريط الأفقي يتحرك يمينًا ويسارًا.', action: demonstrateScroll },
+            // 8- Sheet Tabs
+            { type: 'main', selector: '#sheet-tabs', title: 'علامات تبويب الورقة', text: 'تستخدم لإدارة أوراق العمل المختلفة في المصنف الخاص بك.'},
+            { type: 'sub', selector: '#add-sheet-btn', title: 'إضافة ورقة', text: 'يمكنك إضافة أوراق جديدة إلى المصنف الخاص بك.', action: demonstrateAddSheet},
+            { type: 'sub', selector: '#sheet1', title: 'إعادة تسمية الورقة', text: 'يمكن إعادة تسمية الأوراق لوصف محتواها بشكل أفضل.', action: demonstrateRenameSheet},
+            { type: 'sub', selector: '#sheet2', title: 'إزالة الورقة', text: 'يمكن إزالة الأوراق التي لم تعد هناك حاجة إليها.', action: demonstrateRemoveSheet},
+            { isQuestion: true, text: 'سؤال: ماذا يفعل النقر على علامة \'+\' في شريط علامات تبويب الورقة؟', choices: ['يحذف ورقة', 'يضيف ورقة جديدة', 'يعيد تسمية ورقة'], answer: 'يضيف ورقة جديدة', explanations: {'يحذف ورقة': 'لحذف ورقة، عادةً ما تنقر عليها بالزر الأيمن وتختار "حذف".', 'يعيد تسمية ورقة': 'لإعادة التسمية، عادةً ما تنقر نقرًا مزدوجًا على اسم الورقة.'} },
+            // 9- Status Bar
+            { type: 'main', selector: '.status-bar', title: 'شريط الحالة', text: 'يعرض معلومات حول الحالة الحالية للمصنف.'},
+            { type: 'sub', selector: '#status-cell', title: 'حالة الخلية', text: 'يعرض الوضع الحالي، مثل "Ready" أو "Enter".', action: demonstrateCellStatus },
+            { type: 'sub', selector: '#status-stats', title: 'إحصائيات النطاق', text: 'يعرض حسابات سريعة مثل المجموع أو المتوسط للخلايا المحددة.', action: demonstrateRangeStats },
+            { type: 'sub', selector: '#view-buttons', title: 'أزرار العرض', text: 'يسمح لك بالتبديل بين تخطيطات الصفحات المختلفة.', action: demonstrateViewButtons },
+            { type: 'sub', selector: '#zoom-controls', title: 'شريط تمرير التكبير', text: 'يتحكم في مستوى تكبير ورقة العمل.', action: demonstrateZoom },
+        ];
+    
+        async function showGuideStep(index) {
+            if (index >= guideSteps.length) {
+                guideTitle.textContent = "اكتملت الجولة";
+                guideText.textContent = "لقد رأيت الآن جميع المكونات الرئيسية للواجهة.";
+                if(highlightedEl) highlightedEl.classList.remove('highlight-element', 'sub-highlight-element');
+                positionGuideBox(excelWindow);
+                guideNextBtn.style.display = 'none';
+                guideChoices.style.display = 'flex';
+                return;
+            }
+
+            guideNextBtn.style.display = 'block';
+            guideChoices.style.display = 'none';
+            guideNextBtn.disabled = true;
+
+            if (highlightedEl) highlightedEl.classList.remove('highlight-element', 'sub-highlight-element');
+            
+            const step = guideSteps[index];
+            
+            if (step.isQuestion) {
+                guideBox.style.display = 'none';
+                await askQuestion(step.text, step.choices, step.answer, step.explanations);
+                currentStepIndex++;
+                showGuideStep(currentStepIndex);
+                return;
+            }
+            
+            guideBox.style.display = 'block';
+            guideTitle.textContent = step.title;
+            guideText.textContent = step.text;
+
+            let targetElement = excelWindow;
+            if (step.selector) {
+                targetElement = document.querySelector(step.selector);
+            }
+            
+            if(targetElement) {
+                const highlightClass = step.type === 'sub' ? 'sub-highlight-element' : 'highlight-element';
+                targetElement.classList.add(highlightClass);
+                highlightedEl = targetElement;
+                positionGuideBox(targetElement);
+            }
+
+            if (step.action) {
+                await sleep(500); 
+                await step.action();
+            }
+
+            guideNextBtn.disabled = false;
+        }
+    
+        function endGuide() { 
+            guideOverlay.style.display = 'none'; 
+            if (highlightedEl) highlightedEl.classList.remove('highlight-element', 'sub-highlight-element');
+            excelWindow.style.display = 'none';
+        }
+
+        function restartGuide() {
+            currentStepIndex = 0;
+            showGuideStep(currentStepIndex);
+        }
+
+        function positionGuideBox(targetElement) {
+            if (!targetElement) return;
+            const targetRect = targetElement.getBoundingClientRect();
+            const box = guideBox;
+            
+            let top = targetRect.bottom + 15;
+            let left = targetRect.left + targetRect.width / 2 - box.offsetWidth / 2;
+            box.className = 'arrow-top';
+
+            if (top + box.offsetHeight > window.innerHeight) {
+                top = targetRect.top - box.offsetHeight - 15;
+                box.className = 'arrow-bottom';
+            }
+            
+            if(left < 10) left = 10;
+            if(left + box.offsetWidth > window.innerWidth - 10) left = window.innerWidth - box.offsetWidth - 10;
+            if(top < 10) top = 10;
+            
+            box.style.top = `${top}px`;
+            box.style.left = `${left}px`;
+            box.style.transform = '';
+        }
+    
+        function startGuide() {
+            guideOverlay.style.display = 'block';
+            fakeCursor.style.display = 'block';
+            document.querySelector(".cell[data-col='0'][data-row='1']").classList.add('active');
+            showGuideStep(currentStepIndex);
+        }
+    
+        guideNextBtn.addEventListener('click', () => {
+            currentStepIndex++;
+            showGuideStep(currentStepIndex);
+        });
+        
+        guideFinishBtn.addEventListener('click', endGuide);
+        guideRestartBtn.addEventListener('click', restartGuide);
+
+        // --- INITIALIZATION ---
+        initSpreadsheet();
+        startGuide();
+    });
+
+</script>
+</body>
+</html>
+�
